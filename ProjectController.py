@@ -61,7 +61,7 @@ from editors.FileManagementPanel import FileManagementPanel
 from editors.ProjectNodeEditor import ProjectNodeEditor
 from editors.IECCodeViewer import IECCodeViewer
 from editors.DebugViewer import DebugViewer, REFRESH_PERIOD
-from dialogs import UriEditor, IDManager, ArduinoUploadDialog, DebuggerRemoteConnDialog
+from dialogs import UriEditor, IDManager, DebuggerRemoteConnDialog
 from PLCControler import PLCControler
 from plcopen.structures import IEC_KEYWORDS
 from plcopen.types_enums import ComputeConfigurationResourceName, ITEM_CONFNODE
@@ -1678,7 +1678,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
         "_showIDManager": False,
         "_Repair": False,
         "_generateOpenPLC": True,
-        "_generateArduino": True,
         "_debugPLC"  : True
     }
 
@@ -1689,7 +1688,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
                                  "_Connect": False,
                                  "_Disconnect": False,
                                  "_generateOpenPLC": True,
-                                 "_generateArduino": True,
                                  "_debugPLC": False},
         PlcStatus.Stopped:      {"_Run": True,
                                  "_Stop": False,
@@ -1698,7 +1696,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
                                  "_Disconnect": False,
                                  "_Repair": False,
                                  "_generateOpenPLC": True,
-                                 "_generateArduino": True,
                                  "_debugPLC": True},
         PlcStatus.Empty:        {"_Transfer": False,
                                  "_Connect": False,
@@ -2314,63 +2311,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
                     self.logger.write_error(
                         'It was not possible to save the generated program\n')
 
-    def _generateArduino(self):
-        self._Clean()
-        self._buildType = "remote"
-        if (self._Build() is True):
-            # Get MD5 of the plc_debugger.c file and store that on target
-            debuggerLocation = None
-            CTRoot = self.GetCTRoot()
-            for location, cfiles, calls in CTRoot.LocationCFilesAndCFLAGS:
-                if cfiles:
-                    for file, flag in cfiles:
-                        if "plc_debugger.c" in file:
-                            debuggerLocation = file
-                            break
-
-            if debuggerLocation is None:
-                self.logger.write_error("Error building project: Debugger file is null\n")
-                return
-            MD5 = hashlib.md5(open(debuggerLocation, "rb").read()).hexdigest()
-            if MD5 is None:
-                self.logger.write_error("Error building project: md5 object is null\n")
-                return
-            self.logger.write("Build MD5: ")
-            self.logger.write(MD5)
-
-            f = open(self._getIECgeneratedcodepath(), 'r', encoding="utf-8")
-            program = f.read()
-            f.close()
-
-            self.generate_embed_plc_debugger()
-
-            # Get the Arduino Extension files if they exist
-            arduino_ext_contents = []
-            pattern = re.compile(r'CFile_(\d+)\.c$')
-
-            # Collect all matching files
-            matching_files = []
-            build_path = self._getBuildPath()
-            for filename in os.listdir(build_path):
-                if pattern.match(filename):
-                    matching_files.append(filename)
-
-            matching_files.sort(key=lambda x: int(pattern.match(x).group(1)), reverse=True) # reverse order, just to have the master code blocks in lower file numbers
-
-            # Read the content of each file
-            for filename in matching_files:
-                file_path = os.path.join(build_path, filename)
-                try:
-                    with open(file_path, 'r') as f:
-                        # Add file name as a C++ comment, followed by a blank line
-                        content = f"// PLC source file: {filename}\n\n{f.read()}"
-                        arduino_ext_contents.append(content)
-                except IOError as e:
-                    print(f"Error reading file {filename}: {e}")
-
-            dialog = ArduinoUploadDialog.ArduinoUploadDialog(self.AppFrame, program, arduino_ext_contents, MD5, self)
-            dialog.ShowModal()
-
     def _Repair(self):
         dialog = wx.MessageDialog(
             self.AppFrame,
@@ -2538,13 +2478,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
             "name":    _("Generate Program"),
             "tooltip": _("Generate program for OpenPLC Runtime"),
             "method":   "_generateOpenPLC",
-            "shown":      True,
-        },
-        {
-            "bitmap":    "arduino",
-            "name":    _("Upload Arduino"),
-            "tooltip": _("Transfer program to PLC"),
-            "method":   "_generateArduino",
             "shown":      True,
         },
         {
