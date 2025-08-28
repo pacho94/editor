@@ -477,7 +477,6 @@ class PLCObject(object):
                 # Ack Immediately, for responsiveness
                 self.PythonThreadAcknowledge(cmd)
                 self.PythonRuntimeCall("start")
-                self.LogMessage("Python extensions started")
                 self._PostStartPLC()
                 self.PythonThreadLoop()
                 self.PythonRuntimeCall("stop", reverse_order=True)

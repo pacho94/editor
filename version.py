@@ -28,16 +28,6 @@ import subprocess
 
 import util.paths as paths
 
-
-def GetCommunityHelpMsg():
-    return _(
-        "The best place to ask questions about OpenPLC Runtime\n"
-        "and OpenPLC Editor is in the project's official forum:\n"
-        "\n"
-        "https://openplc.discussion.community/\n"
-    )
-
-
 def GetAppRevision():
     rev = None
     app_dir = paths.AbsDir(__file__)

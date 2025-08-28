@@ -9,8 +9,6 @@ from datetime import datetime
 
 import click
 
-import fake_wx
-
 from ProjectController import ProjectController
 from LocalRuntimeMixin import LocalRuntimeMixin
 from runtime.loglevels import LogLevelsCount, LogLevels
