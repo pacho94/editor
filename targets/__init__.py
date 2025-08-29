@@ -47,22 +47,16 @@ def _GetLocalTargetClassFactory(name):
 
 
 targets = dict([(name, {"xsd":   path.join(_base_path, name, "XSD"),
-                        "class": _GetLocalTargetClassFactory(name),
-                        "code":  {fname: path.join(_base_path, name, fname)
-                                  for fname in listdir(path.join(_base_path, name))
-                                  if (fname.startswith("plc_%s_main" % name) and
-                                      fname.endswith(".c"))}})
+                        "class": _GetLocalTargetClassFactory(name)})
                 for name in listdir(_base_path)
                 if (path.isdir(path.join(_base_path, name)) and
                     not name.startswith("__"))])
 
-toolchains = {"gcc":  path.join(_base_path, "XSD_toolchain_gcc"),
-              "makefile":  path.join(_base_path, "XSD_toolchain_makefile")}
+toolchains = {"cmake":  path.join(_base_path, "XSD_toolchain_cmake")}
 
 
 def GetBuilder(targetname):
     return targets[targetname]["class"]()
-
 
 def GetTargetChoices():
     DictXSD_toolchain = {}
@@ -81,12 +75,12 @@ def GetTargetChoices():
 
     return targetchoices
 
-
-def GetTargetCode(targetname):
-    codedesc = targets[targetname]["code"]
-    code = "\n".join([open(fpath).read() for _fname, fpath in sorted(codedesc.items())])
-    return code
-
+def GetSubDir(targetname):
+    subdir = path.join(_base_path, targetname)
+    if path.isdir(subdir):
+        return subdir
+    else:
+        return None
 
 def GetHeader():
     filename = paths.AbsNeighbourFile(__file__, "beremiz.h")

@@ -384,16 +384,9 @@ class ProjectController(ConfigTreeNode, PLCControler):
         return "PROJECT"
 
     def GetDefaultTargetName(self):
-        if sys.platform.startswith('linux'):
-            return "Linux"
-        elif sys.platform.startswith('darwin'):
-            return "OSX"
-        elif sys.platform.startswith('win32'):
-            return "Win32"
-
+        # TODO set differently
         # Fall back to Linux as default target
-        return "Linux"
-
+        return "STM32F7"
 
     def GetTarget(self):
         target = self.BeremizRoot.getTargetType()
@@ -1221,54 +1214,13 @@ class ProjectController(ConfigTreeNode, PLCControler):
         return debug_code
 
     def Generate_plc_main(self):
-        """
-        Use confnodes layout given in LocationCFilesAndCFLAGS to
-        generate glue code that dispatch calls to all confnodes
-        """
-        # filter location that are related to code that will be called
-        # in retreive, publish, init, cleanup
-        locstrs = ["_".join(map(str, x)) for x in [loc for loc, _Cfiles, DoCalls in
-                       self.LocationCFilesAndCFLAGS if loc and DoCalls]]
-
-        # Generate main, based on template
-        # NOTE: For now the runtime extensions are disabled on OpenPLC as it breaks OpenPLC debugger
-        if False: #not self.BeremizRoot.getDisable_Extensions():
-            plc_main_code = targets.GetCode("plc_main_head.c") % {
-                "calls_prototypes": "\n".join([(
-                    "int __init_%(s)s(int argc,char **argv);\n" +
-                    "void __cleanup_%(s)s(void);\n" +
-                    "void __retrieve_%(s)s(void);\n" +
-                    "void __publish_%(s)s(void);") % {'s': locstr} for locstr in locstrs]),
-                "retrieve_calls": "\n    ".join([
-                    "__retrieve_%s();" % locstr for locstr in locstrs]),
-                "publish_calls": "\n    ".join([  # Call publish in reverse order
-                    "__publish_%s();" % locstrs[i - 1] for i in range(len(locstrs), 0, -1)]),
-                "init_calls": "\n    ".join([
-                    "init_level=%d; " % (i + 1) +
-                    "if((res = __init_%s(argc,argv))){" % locstr +
-                    # "printf(\"%s\"); "%locstr + #for debug
-                    "return res;}" for i, locstr in enumerate(locstrs)]),
-                "cleanup_calls": "\n    ".join([
-                    "if(init_level >= %d) " % i +
-                    "__cleanup_%s();" % locstrs[i - 1] for i in range(len(locstrs), 0, -1)])
-            }
-        else:
-            plc_main_code = targets.GetCode("plc_main_head.c") % {
-                "calls_prototypes": "\n",
-                "retrieve_calls":   "\n",
-                "publish_calls":    "\n",
-                "init_calls":       "\n",
-                "cleanup_calls":    "\n"
-            }
-
+        plc_main_code = targets.GetCode("plc_main_head.c")
         located_var_counter = 0
         for iec_var in self.PLCGeneratedLocatedVars:
             plc_main_code += 'IEC_' + iec_var["IEC_TYPE"] + ' var' + str(located_var_counter) + ';\n'
             plc_main_code += 'IEC_' + iec_var["IEC_TYPE"] + ' *' + iec_var["NAME"] + ' = &var' + str(located_var_counter) + ';\n'
             located_var_counter += 1
 
-        plc_main_code += targets.GetTargetCode(
-            self.GetTarget().getcontent().getLocalTag())
         plc_main_code += targets.GetCode("plc_main_tail.c")
         return plc_main_code
 
@@ -1285,6 +1237,10 @@ class ProjectController(ConfigTreeNode, PLCControler):
         # Eventually create build dir
         if not os.path.exists(buildpath):
             os.mkdir(buildpath)
+
+        shutil.copytree(targets.GetSubDir(self.GetTarget().getcontent().getLocalTag()), buildpath, dirs_exist_ok=True)
+
+        self._setBuildPath(os.path.join(buildpath, self.GetBuilder().GetPLCDir()))
 
         self.logger.flush()
         self.logger.write(_("Start build in %s\n") % buildpath)
@@ -1331,10 +1287,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
 
     def _Generate_runtime(self):
         buildpath = self._getBuildPath()
-
-        # CTN code gen is expected AFTER Libraries code gen,
-        # at least SVGHMI relies on it.
-
         # Generate C code and compilation params from liraries
         try:
             LibCFilesAndCFLAGS, LibLDFLAGS, LibExtraFiles = self.GetLibrariesCCode(

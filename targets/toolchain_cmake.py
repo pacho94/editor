@@ -4,8 +4,7 @@
 # This file is part of Beremiz, a Integrated Development Environment for
 # programming IEC 61131-3 automates supporting plcopen standard and CanFestival.
 #
-# Copyright (C) 2007: Edouard TISSERANT and Laurent BESSARD
-# Copyright (C) 2017: Paul Beltyukov
+# Copyright (C) 2025: Enrico Buffoli
 #
 # See COPYING file for copyrights details.
 #
@@ -36,9 +35,9 @@ from util.ProcessLogger import ProcessLogger
 includes_re = re.compile(r'\s*#include\s*["<]([^">]*)[">].*')
 
 
-class toolchain_gcc(object):
+class toolchain_cmake(object):
     """
-    This abstract class contains GCC specific code.
+    This abstract class contains CMake specific code.
     It cannot be used as this and should be inherited in a target specific
     class such as target_linux or target_win32
     """
@@ -47,40 +46,8 @@ class toolchain_gcc(object):
         self.buildpath = None
         self.SetBuildPath(self.CTRInstance._getBuildPath())
 
-    def getBuilderCFLAGS(self):
-        """
-        Returns list of builder specific CFLAGS
-        """
-        cflags = [self.CTRInstance.GetTarget().getcontent().getCFLAGS()]
-        if "CFLAGS" in os.environ:
-            cflags.append(os.environ["CFLAGS"])
-        if "SYSROOT" in os.environ:
-            cflags.append("--sysroot="+os.environ["SYSROOT"])
-        return cflags
-
-    def getBuilderLDFLAGS(self):
-        """
-        Returns list of builder specific LDFLAGS
-        """
-        ldflags = self.CTRInstance.LDFLAGS + \
-            [self.CTRInstance.GetTarget().getcontent().getLDFLAGS()]
-        if "LDLAGS" in os.environ:
-            ldflags.append(os.environ["LDLAGS"])
-        if "SYSROOT" in os.environ:
-            ldflags.append("--sysroot="+os.environ["SYSROOT"])
-        return ldflags
-
-    def getCompiler(self):
-        """
-        Returns compiler
-        """
-        return self.CTRInstance.GetTarget().getcontent().getCompiler()
-
-    def getLinker(self):
-        """
-        Returns linker
-        """
-        return self.CTRInstance.GetTarget().getcontent().getLinker()
+    def GetPLCDir(self):
+        pass
 
     def GetBinaryPath(self):
         return self.bin_path
@@ -160,11 +127,7 @@ class toolchain_gcc(object):
         return hashlib.md5(wholesrcdata).hexdigest()
 
     def build(self):
-        # Retrieve compiler and linker
-        self.compiler = self.getCompiler()
-        self.linker = self.getLinker()
-
-        Builder_CFLAGS = ' '.join(self.getBuilderCFLAGS())
+        # ---------- Copy subdirectory containing target files -----------
 
         # ----------------- GENERATE OBJECT FILES ------------------------
         obns = []
