@@ -332,15 +332,6 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
         self._RecursiveAddMenuItems(parent, GetAddMenuItems())
 
     def _init_coll_HelpMenu_Items(self, parent):
-        def handler(event):
-            return wx.MessageBox(
-                version.GetCommunityHelpMsg(),
-                _('Community support'),
-                wx.OK | wx.ICON_INFORMATION)
-
-        item = parent.Append(wx.ID_ANY, _('Community support'), '')
-        self.Bind(wx.EVT_MENU, handler, item)
-
         parent.Append(wx.MenuItem(helpString='', id=wx.ID_ABOUT,
                       kind=wx.ITEM_NORMAL, text=_('About')))
         self.Bind(wx.EVT_MENU, self.OnAboutMenu, id=wx.ID_ABOUT)
