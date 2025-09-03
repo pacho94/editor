@@ -1,0 +1,3 @@
+[submodule "targets/STM32F7"]
+	path = targets/STM32F7
+	url = https://github.com/pacho94/stm32h7_plc.git
