@@ -399,6 +399,14 @@ class ProjectController(ConfigTreeNode, PLCControler):
                 self.Parser.CreateElement(target_name, "TargetType"))
         return target
 
+    def SetTarget(self, target_name):
+        temp_root = self.Parser.CreateRoot()
+        target = self.Parser.CreateElement("TargetType", "BeremizRoot")
+        temp_root.setTargetType(target)
+        target.setcontent(
+            self.Parser.CreateElement(target_name, "TargetType"))
+        self.BeremizRoot.setTargetType(target)
+
     def GetParamsAttributes(self, path=None):
         params = ConfigTreeNode.GetParamsAttributes(self, path)
         if params[0]["name"] == "BeremizRoot":
@@ -462,7 +470,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
             {'Task': def_task[0].get('Name'), 'Type': self.GetProjectPouNames()[0], 'Name': 'instance0'}]
         self.SetEditedResourceInfos(resource_tagname, def_task, def_instance)
 
-    def NewProject(self, ProjectPath, BuildPath=None):
+    def NewProject(self, ProjectPath, TargetType, BuildPath=None):
         """
         Create a new project in an empty folder
         @param ProjectPath: path of the folder where project have to be created
@@ -487,6 +495,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
         # Keep track of the root confnode (i.e. project path)
         self.ProjectPath = ProjectPath
         self._setBuildPath(BuildPath)
+        self.SetTarget(TargetType)
         # get confnodes bloclist (is that usefull at project creation?)
         self.RefreshConfNodesBlockLists()
         # set default scaling properties
@@ -495,8 +504,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
         PLCControler.SetProjectProperties(self, properties={"scaling": {'SFC': (10, 10)}})
         # this will create files base XML files
         self.SaveProject()
-        # Save Arduino settings (if any)
-        self.SaveArduinoSettings()
         return None
 
     def LoadProject(self, ProjectPath, BuildPath=None):
@@ -610,7 +617,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
                     shutil.copytree(old_projectfiles_path,
                               self._getProjectFilesPath(self.ProjectPath))
             self.SaveXMLFile(os.path.join(self.ProjectPath, 'plc.xml'))
-            self.SaveArduinoSettings()
             result = self.CTNRequestSave(from_project_path)
             if result:
                 self.logger.write_error(result)
@@ -1526,35 +1532,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
             return self._FileEditors.get(filepath)
         else:
             return ConfigTreeNode._OpenView(self, self.CTNName(), onlyopened)
-
-    def GetArduinoSettings(self):
-        return self.arduinoSettings
-
-    def LoadArduinoSettings(self):
-        if self.ProjectPath is None:
-            self.arduinoSettings = {}
-            return
-
-        settings_file = os.path.join(self.ProjectPath, "arduino_settings.json")
-        if os.path.exists(settings_file):
-            with open(settings_file, 'r') as f:
-                try:
-                    self.arduinoSettings = json.load(f)
-                except json.JSONDecodeError:
-                    self.logger.write_error(_("Error decoding Arduino settings file. Using default settings.") + "\n")
-                    self.arduinoSettings = {}
-        else:
-            self.arduinoSettings = {}
-
-    def SaveArduinoSettings(self):
-        if self.ProjectPath and self.arduinoSettings:
-            settings_file = os.path.join(self.ProjectPath, "arduino_settings.json")
-            with open(settings_file, 'w') as f:
-                json.dump(self.arduinoSettings, f, indent=2, sort_keys=True)
-
-    def SetArduinoSettingsChanged(self):
-        self.ChangesToSave = True
-        self.arduinoSettings['last_modified'] = time.time()  # Optional: timestamp of last modification
 
     def OnCloseEditor(self, view):
         ConfigTreeNode.OnCloseEditor(self, view)

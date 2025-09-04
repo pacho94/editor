@@ -53,6 +53,7 @@ from controls.LogViewer import LogViewer
 from controls.CustomStyledTextCtrl import CustomStyledTextCtrl
 from controls import EnhancedStatusBar as esb
 from dialogs.AboutDialog import ShowAboutDialog
+from dialogs import NewProjectDialog
 
 from plcopen.types_enums import \
     ComputeConfigurationName, \
@@ -267,7 +268,7 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
 
             projectpath = os.path.join(examples_dir, dirname)
 
-            def OpenExemple(event, projectpath=projectpath):
+            def OpenExample(event, projectpath=projectpath):
                 if self.CTR is not None and not self.CheckSaveBeforeClosing():
                     return
 
@@ -275,7 +276,7 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
                 if not self.CTR.CheckProjectPathPerm():
                     self.ResetView()
 
-            self.Bind(wx.EVT_MENU, OpenExemple, item)
+            self.Bind(wx.EVT_MENU, OpenExample, item)
         parent.AppendSeparator()
         AppendMenu(parent, help='', id=wx.ID_SAVE,
                    kind=wx.ITEM_NORMAL, text=_('Save') + '\tCTRL+S')
@@ -877,16 +878,17 @@ class Beremiz(IDEFrame, LocalRuntimeMixin):
             defaultpath = DecodeFileSystemPath(self.Config.Read("lastopenedfolder").encode())
         except Exception:
             defaultpath = os.path.expanduser("~")
-
-        dialog = wx.DirDialog(self, _("Choose an empty directory for new project"), defaultpath)
+        dialog = NewProjectDialog.NewProjectDialog(self)
         if dialog.ShowModal() == wx.ID_OK:
-            projectpath = dialog.GetPath()
+            #Create project directory
+            projectpath = os.path.join(str(self.Config.Read("workspace")), dialog.GetProjectName())
+            os.mkdir(projectpath)
             self.Config.Write("lastopenedfolder",
                               EncodeFileSystemPath(os.path.dirname(projectpath)))
             self.Config.Flush()
             self.ResetView()
             ctr = ProjectController(self, self.Log)
-            result = ctr.NewProject(projectpath)
+            result = ctr.NewProject(projectpath, dialog.GetType())
             if not result:
                 self.CTR = ctr
                 self.Controler = self.CTR

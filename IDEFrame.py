@@ -27,6 +27,7 @@ from functools import cmp_to_key
 import pickle
 from operator import eq
 import base64
+from os import mkdir
 
 import wx
 import wx.grid
@@ -680,6 +681,14 @@ class IDEFrame(wx.Frame):
 
         self.Controler = None
         self.Config = wx.ConfigBase.Get()
+        # Create workspace directory
+        if not self.Config.HasEntry("workspace"):
+            from pathlib import Path
+            home = Path.home()
+            workspace_path = os.path.join(str(home) ,"uPLC_workspace")
+            os.mkdir(workspace_path)
+            self.Config.Write("workspace", workspace_path)
+
         self.EnableDebug = enable_debug
 
         self.InitEditorToolbarItems()
