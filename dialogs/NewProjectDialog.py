@@ -45,8 +45,8 @@ class NewProjectDialog(wx.Dialog):
     def __init__(self, parent):
         title = _("New Project")
         wx.Dialog.__init__(self, parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-        self.SetSize((480, 500))
-        self.SetMinSize((480, 500))
+        self.SetSize((480, 150))
+        self.SetMinSize((480, 150))
         self.SetMaxSize((480, 640))
 
         if parent and parent.GetIcon():
