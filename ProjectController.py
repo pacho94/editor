@@ -545,9 +545,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
         self.RefreshConfNodesBlockLists()
         self.UpdateButtons()
 
-        # Load Arduino settings, handles failure graceful (i.e. file does not exist)
-        self.LoadArduinoSettings()
-
         return None, False
 
     def RecursiveConfNodeInfos(self, confnode):
@@ -1584,8 +1581,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
         wx.CallAfter(self._BlockButtons)
 
     def _UnblockButtons(self):
-        self.EnableMethod("_Run", True)
-        self.EnableMethod("_generateOpenPLC", True)
         if self.AppFrame is not None and not self.UpdateMethodsFromPLCStatus():
             self.AppFrame.RefreshStatusToolBar()
 
@@ -1600,13 +1595,12 @@ class ProjectController(ConfigTreeNode, PLCControler):
     DefaultMethods = {
         "_Run": True,
         "_Stop": False,
-        "_Transfer": False,
-        "_Connect": False,
+        "_Transfer": True,
+        "_Connect": True,
         "_Disconnect": False,
         "_showIECcode": False,
         "_showIDManager": False,
         "_Repair": False,
-        "_generateOpenPLC": True,
         "_debugPLC"  : True
     }
 
@@ -1616,7 +1610,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
                                  "_Transfer": False,
                                  "_Connect": False,
                                  "_Disconnect": False,
-                                 "_generateOpenPLC": True,
                                  "_debugPLC": False},
         PlcStatus.Stopped:      {"_Run": True,
                                  "_Stop": False,
@@ -1624,7 +1617,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
                                  "_Connect": False,
                                  "_Disconnect": False,
                                  "_Repair": False,
-                                 "_generateOpenPLC": True,
                                  "_debugPLC": True},
         PlcStatus.Empty:        {"_Transfer": False,
                                  "_Connect": False,
@@ -1934,41 +1926,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
             self.DispatchDebugValuesTimer.Start(
                 int(REFRESH_PERIOD * 1000), oneShot=True)
 
-    def _Run(self):
-        """
-        Start PLC
-        """
-        success = False
-
-        self.BlockButtons()
-        # Clean build folder
-        self._Clean()
-        self._buildType = "simulator"
-        # Build Project
-        if (self._Build() is False):
-            self.UnblockButtons()
-            return success
-        # Connect to target
-        if (self._Connect() is False):
-            self.UnblockButtons()
-            return success
-        #Set debugger type
-        self._connector.SetDebuggerType('simulation')
-        # Transfer PLC program
-        if (self._Transfer() is False):
-            self.UnblockButtons()
-            return success
-        # Run
-        if self.GetIECProgramsAndVariables():
-            self._connector.StartPLC()
-            self.logger.write(_("Starting PLC\n"))
-            self._connect_debug()
-            success = True
-        else:
-            self.logger.write_error(_("Couldn't start PLC !\n"))
-        wx.CallAfter(self.UpdateMethodsFromPLCStatus)
-        return success
-
     def _Stop(self):
         """
         Stop PLC
@@ -2178,68 +2135,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
         wx.CallAfter(self.UpdateMethodsFromPLCStatus)
         return success
 
-    def _generateOpenPLC(self):
-        self._Clean()
-        self._buildType = "remote"
-        if (self._Build() is True):
-            # Generate debug info from arduino debugger
-            self.generate_embed_plc_debugger()
-            base_folder = paths.AbsDir(__file__)
-            c_file = os.path.join(base_folder, 'arduino', 'src', 'debug.c')
-            f = open(c_file, "r")
-            c_debug = f.read()
-            f.close()
-
-            # Get MD5 of the plc_debugger.c file and store that on target
-            debuggerLocation = None
-            CTRoot = self.GetCTRoot()
-            for location, cfiles, calls in CTRoot.LocationCFilesAndCFLAGS:
-                if cfiles:
-                    for file, flag in cfiles:
-                        if "plc_debugger.c" in file:
-                            debuggerLocation = file
-                            break
-
-            if debuggerLocation is None:
-                self.logger.write_error("Error building project: Debugger file is null\n")
-                return
-            MD5 = hashlib.md5(open(debuggerLocation, "rb").read()).hexdigest()
-            if MD5 is None:
-                self.logger.write_error("Error building project: md5 object is null\n")
-                return
-            self.logger.write("Build MD5: ")
-            self.logger.write(MD5)
-
-            # Add MD5 value to debug.cpp file
-            c_debug = 'char md5[] = "' + MD5 + '";\n' + c_debug
-
-            # Read ST program
-            f = open(self._getIECgeneratedcodepath(), 'r', encoding="utf-8")
-            program = f.read()
-            f.close()
-
-            # Wrap debugger code around (* comments *)
-            c_debug_lines = c_debug.split('\n')
-            c_debug = [f'(*DBG:{line}*)' for line in c_debug_lines]
-            c_debug = '\n'.join(c_debug)
-
-            # Concatenate debugger code with st program
-            program = program + '\n' + c_debug
-
-            dlg = wx.FileDialog(self.AppFrame, "Save to file:", "", "",
-                                "OpenPLC Program(*.st)|*.st", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
-            if dlg.ShowModal() == wx.ID_OK:
-                try:
-                    f = open(dlg.GetPath(), "w", encoding="utf-8")
-                    f.write(program)
-                    f.close()
-                    #wx.MessageBox('OpenPLC program generated successfully', 'Info', wx.OK | wx.ICON_INFORMATION)
-                    self.logger.write(
-                        "OpenPLC program generated successfully\n")
-                except:
-                    self.logger.write_error(
-                        'It was not possible to save the generated program\n')
-
     def _Repair(self):
         dialog = wx.MessageDialog(
             self.AppFrame,
@@ -2336,7 +2231,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
             "name":    _("Build"),
             "tooltip": _("Build project into build folder"),
             "method":   "_Build",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "Clean",
@@ -2344,13 +2239,6 @@ class ProjectController(ConfigTreeNode, PLCControler):
             "tooltip": _("Clean project build folder"),
             "method":   "_Clean",
             "enabled":    False,
-            "shown":      False,
-        },
-        {
-            "bitmap":    "Run",
-            "name":    _("Run"),
-            "tooltip": _("Start PLC Simulation"),
-            "method":   "_Run",
             "shown":      True,
         },
         {
@@ -2358,55 +2246,48 @@ class ProjectController(ConfigTreeNode, PLCControler):
             "name":    _("Stop"),
             "tooltip": _("Stop PLC"),
             "method":   "_Stop",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "Connect",
             "name":    _("Connect"),
             "tooltip": _("Connect to the target PLC"),
             "method":   "_Connect",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "Transfer",
             "name":    _("Transfer"),
             "tooltip": _("Transfer PLC"),
             "method":   "_Transfer",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "Disconnect",
             "name":    _("Disconnect"),
             "tooltip": _("Disconnect from PLC"),
             "method":   "_Disconnect",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "Repair",
             "name":    _("Repair"),
             "tooltip": _("Repair broken PLC"),
             "method":   "_Repair",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "IDManager",
             "name":    _("ID Manager"),
             "tooltip": _("Manage secure connection identities"),
             "method":   "_showIDManager",
-            "shown":      False,
+            "shown":      True,
         },
         {
             "bitmap":    "ShowIECcode",
             "name":    _("Show code"),
             "tooltip": _("Show IEC code generated by PLCGenerator"),
             "method":   "_showIECcode",
-            "shown":      False,
-        },
-        {
-            "bitmap":    "down",
-            "name":    _("Generate Program"),
-            "tooltip": _("Generate program for OpenPLC Runtime"),
-            "method":   "_generateOpenPLC",
             "shown":      True,
         },
         {
